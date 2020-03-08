@@ -92,6 +92,19 @@ def _jacfwd(f, primals):
     tangent_mask[primal_index] = array_ops.zeros_like(primal)
   return nest.pack_sequence_as(primals, jac_flat)
 
+def _jvp_batch(f, primals, tangent_batch):
+    """Compute the jacobian of `f` at `primals` multiplied by `tangents`."""
+    jac_fwd = _jacfwd(f, primals)
+    def jac_mul(tangent):
+      flat_tangent = array_ops.reshape(tangent, shape=[-1])
+      tangent_vector = array_ops.expand_dims(flat_tangent, 1)
+      jvp_vector = math_ops.matmul(jac_fwd, tangent_vector)
+      return array_ops.reshape(jvp_vector, tangent.shape)
+
+    return control_flow_ops.vectorized_map(
+        jac_mul,
+        tangent_batch)
+
 
 def _grad(f, argnums=0):
   """Return a function which computes the gradient of `f`."""
@@ -645,6 +658,17 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
             forwardprop_util.pack_tangents([primal_out]))
         self.assertAllClose([6., 4., 8.], packed_output_tangents)
         self.assertAllEqual(expected_indices, packed_output_indices)
+
+  @parameterized.named_parameters(
+    [("rank_1",  math_ops.sin, (2, ), 10),
+     ("rank_2",  math_ops.sin, (2, 3), 10),
+     ("rank_3", math_ops.sin, (2,3,4), 10),
+     ("rank_4", math_ops.sin, (2,3,4), 10)]
+  def testJVPVecTensorShape(self, f, primal_shape, batch_size):
+    primals = [random_ops.random_uniform(primal_shape)]
+    tanget_batch = random_ops.random_uniform([batch_size, *primal_shape])
+    jvp_batch = _jvp_batch(f, primals, tanget_batch)
+    self.assertShapeEqual(tanget_batch[0].numpy(), jvp_batch[0])
 
   def testFunctionGradInFunctionPureForward(self):
 
