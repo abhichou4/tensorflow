@@ -204,14 +204,16 @@ def clip(a, a_min, a_max):  # pylint: disable=missing-docstring
 
 @np_utils.np_doc('matmul')
 def matmul(x1, x2):  # pylint: disable=missing-docstring
-
   def f(x1, x2):
     try:
+      if x1.shape.rank == 2 and x2.shape.rank == 2:
+        # Fast path for known ranks.
+        return math_ops.matmul(x1, x2)
       return np_utils.cond(
-          math_ops.equal(array_ops.rank(x2), 1),
+          math_ops.equal(np_utils.tf_rank(x2), 1),
           lambda: math_ops.tensordot(x1, x2, axes=1),
           lambda: np_utils.cond(  # pylint: disable=g-long-lambda
-              math_ops.equal(array_ops.rank(x1), 1),
+              math_ops.equal(np_utils.tf_rank(x1), 1),
               lambda: math_ops.tensordot(  # pylint: disable=g-long-lambda
                   x1, x2, axes=[[0], [-2]]),
               lambda: math_ops.matmul(x1, x2)))
@@ -950,6 +952,8 @@ setattr(np_arrays.ndarray, '__sub__', _wrap(subtract))
 setattr(np_arrays.ndarray, '__rsub__', _wrap(subtract, True))
 setattr(np_arrays.ndarray, '__mul__', _wrap(multiply))
 setattr(np_arrays.ndarray, '__rmul__', _wrap(multiply, True))
+setattr(np_arrays.ndarray, '__matmul__', _wrap(matmul))
+setattr(np_arrays.ndarray, '__rmatmul__', _wrap(matmul, True))
 setattr(np_arrays.ndarray, '__pow__', _wrap(power))
 setattr(np_arrays.ndarray, '__rpow__', _wrap(power, True))
 setattr(np_arrays.ndarray, '__truediv__', _wrap(true_divide))

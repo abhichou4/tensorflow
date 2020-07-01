@@ -52,7 +52,7 @@ def convert_to_tensor(value, dtype=None, dtype_hint=None):
   if (dtype is None and isinstance(value, six.integer_types) and
       value >= 2**63):
     dtype = dtypes.uint64
-  elif (dtype is None and isinstance(value, float)):
+  elif dtype is None and dtype_hint is None and isinstance(value, float):
     dtype = np_dtypes.default_float_type()
   return ops.convert_to_tensor(value, dtype=dtype, dtype_hint=dtype_hint)
 
@@ -67,6 +67,7 @@ class NdarraySpec(type_spec.BatchableTypeSpec):
       raise ValueError('NdarraySpec.__init__ was expecting a tf.TypeSpec, '
                        'but got a {} instead.'.format(type(data_spec)))
     self._data_spec = data_spec
+    self._hash = None
 
   @property
   def _component_specs(self):
@@ -82,10 +83,15 @@ class NdarraySpec(type_spec.BatchableTypeSpec):
     return (self._data_spec,)
 
   def _batch(self, batch_size):
-    return NdarraySpec(self._data_spec.batch(batch_size))
+    return NdarraySpec(self._data_spec._batch(batch_size))  # pylint: disable=protected-access
 
   def _unbatch(self):
-    return NdarraySpec(self._data_spec.unbatch())
+    return NdarraySpec(self._data_spec._unbatch())  # pylint: disable=protected-access
+
+  def __hash__(self):
+    if self._hash is None:
+      self._hash = hash((type(self), self._data_spec))
+    return self._hash
 
 
 class ndarray(composite_tensor.CompositeTensor):  # pylint: disable=invalid-name
@@ -141,13 +147,12 @@ class ndarray(composite_tensor.CompositeTensor):  # pylint: disable=invalid-name
         raise ValueError('Unexpected type for `buffer` {}. Must be an ndarray,'
                          ' Tensor or np.ndarray.'.format(type(buffer)))
 
-      if shape is not None and tuple(shape) != buffer._shape_tuple():  # pylint: disable=protected-access
-        # TODO(srbs): NumPy allows this. Investigate if/how to support this.
-        raise ValueError('shape arg must match buffer.shape.')
+      if shape is not None:
+        buffer.set_shape(shape)
 
     assert isinstance(buffer, ops.Tensor)
     if dtype and dtype != buffer.dtype:
-      buffer = array_ops.bitcast(buffer, dtype)
+      buffer = math_ops.cast(buffer, dtype)
     self._data = buffer
     self._type_spec_internal = None
 
@@ -295,7 +300,7 @@ class ndarray(composite_tensor.CompositeTensor):  # pylint: disable=invalid-name
     # TODO(wangpeng): Handle graph mode
     if not isinstance(self.data, ops.EagerTensor):
       raise TypeError('Indexing using symbolic tensor is not allowed')
-    return np.asscalar(self.data.numpy())
+    return self.data.numpy().item()
 
   def tolist(self):
     return self.data.numpy().tolist()
@@ -305,10 +310,6 @@ class ndarray(composite_tensor.CompositeTensor):  # pylint: disable=invalid-name
 
   def __repr__(self):
     return 'ndarray<{}>'.format(self.data.__repr__())
-
-  @property
-  def _id(self):
-    return self.data._id  # pylint: disable=protected-access
 
 
 def tensor_to_ndarray(tensor):

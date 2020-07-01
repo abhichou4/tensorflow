@@ -61,7 +61,7 @@ struct TensorDescriptor : public GPUObjectDescriptor {
                                const std::vector<std::string>& template_args,
                                std::string* result) const override;
 
-  GPUResources GetGPUResources(AccessType access_type) const override;
+  GPUResources GetGPUResources() const override;
 
   bool HasAxis(Axis axis) const;
   void SetTextureAddressMode(TextureAddressMode mode);
@@ -85,6 +85,15 @@ struct TensorDescriptor : public GPUObjectDescriptor {
   absl::Status PerformGetAddressSelector(const std::vector<std::string>& args,
                                          std::string* result) const;
 
+  absl::Status PerformGetPtrWithSliceOffsetSelector(
+      const std::vector<std::string>& args, std::string* result) const;
+
+  absl::Status PerformGetWHOffsetSelector(const std::vector<std::string>& args,
+                                          std::string* result) const;
+
+  absl::Status PerformGetHandleSelector(const std::vector<std::string>& args,
+                                        std::string* result) const;
+
   std::string DeclareAddress(const std::string& var_name,
                              const std::string& address) const;
 
@@ -93,12 +102,18 @@ struct TensorDescriptor : public GPUObjectDescriptor {
   absl::Status PerformWriteSelector(const std::vector<std::string>& args,
                                     std::string* result) const;
 
+  absl::Status PerformWriteLinearSelector(const std::vector<std::string>& args,
+                                          std::string* result) const;
+
   std::string Read(DataType read_as_type,
                    const std::string& global_address) const;
   std::string Write(const std::string& var_name,
                     const std::string& global_address) const;
 
   bool IsBatchedWidth() const;
+
+  std::string GetWidth() const;
+  std::string GetSliceStride() const;
 
   TextureAddressMode ModeFromState() const;
 
