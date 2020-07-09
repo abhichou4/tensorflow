@@ -348,7 +348,7 @@ class ForwardAccumulator(object):
       ValueError: If the same tensor or variable is specified multiple times in
         `primals`.
     """
-    self._accumulator = pywrap_tfe.TFE_Py_ForwardAccumulatorNew()
+    self._accumulator = pywrap_tfe.TFE_Py_ForwardAccumulatorNew(False)
     self._recording = False
     primal_ids = set()
     for primal in nest.flatten(primals):
@@ -439,3 +439,7 @@ class ForwardAccumulator(object):
         return array_ops.zeros_like(tensor)
       return result
     return nest.map_structure(_fetch_jvp, primals)
+
+  @staticmethod
+  def _jvp_batch(self, primals, tangents):
+    raise NotImplementedError("work in progress")

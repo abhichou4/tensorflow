@@ -2749,7 +2749,8 @@ PyObject* TFE_Py_TapeGradient(PyObject* tape, PyObject* target,
   return PyList_New(0);
 }
 
-PyObject* TFE_Py_ForwardAccumulatorNew() {
+// Take a boolean and initialize accumulator with correct class
+PyObject* TFE_Py_ForwardAccumulatorNew(PyObject* use_batch) {
   TFE_Py_ForwardAccumulator_Type.tp_new = PyType_GenericNew;
   if (PyType_Ready(&TFE_Py_ForwardAccumulator_Type) < 0) return nullptr;
   TFE_Py_ForwardAccumulator* accumulator =
@@ -2760,7 +2761,12 @@ PyObject* TFE_Py_ForwardAccumulatorNew() {
             "ForwardAccumulator requires a PyVSpace to be registered."),
         nullptr);
   }
-  accumulator->accumulator = new ForwardAccumulator(*py_vspace);
+  if (PyObject_IsTrue(use_batch)) {
+    accumulator->accumulator = new ForwardAccumulatorV2(*py_vspace);
+  }
+  else {
+    accumulator->accumulator = new ForwardAccumulatorV1(*py_vspace);
+  }
   return reinterpret_cast<PyObject*>(accumulator);
 }
 
