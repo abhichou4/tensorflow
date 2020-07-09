@@ -200,7 +200,20 @@ class ForwardFunction
 //
 // Not thread-safe.
 template <typename Gradient, typename BackwardFunction, typename TapeTensor>
-class ForwardAccumulator {
+class ForwardAccumulatorClass {
+  virtual Status Accumulate(
+      const string& op_type, const std::vector<TapeTensor>& input_tensors,
+      const std::vector<TapeTensor>& output_tensors,
+      gtl::ArraySlice<int64> input_tensor_id,
+      gtl::ArraySlice<tensorflow::DataType> input_dtypes,
+      const ForwardFunction<Gradient>* forward_function,
+      const std::function<BackwardFunction*()>& backward_function_getter,
+      const std::function<void(BackwardFunction*)>& backward_function_deleter) = 0;
+}
+
+template <typename Gradient, typename BackwardFunction, typename TapeTensor>
+class ForwardAccumulator 
+  : public ForwardAccumulatorClass<Gradient, BackwardFunction, TapeTensor> {
  public:
   // Does not take ownership of `vspace`, which must outlive the
   // ForwardAccumulator.
@@ -335,6 +348,20 @@ class ForwardAccumulator {
   std::stack<AccumulatorCallState> call_state_;
 };
 
+template <typename Gradient, typename BackwardFunction, typename TapeTensor>
+class ForwardAccumulatorV2 : 
+  public ForwardAccumulatorClass<Gradient, BackwardFunction, TapeTensor>, 
+  public ForwardAccumulator<Gradient, BackwardFunction, TapeTensor> {
+ public:
+  Status Accumulate(
+      const string& op_type, const std::vector<TapeTensor>& input_tensors,
+      const std::vector<TapeTensor>& output_tensors,
+      gtl::ArraySlice<int64> input_tensor_id,
+      gtl::ArraySlice<tensorflow::DataType> input_dtypes,
+      const ForwardFunction<Gradient>* forward_function,
+      const std::function<BackwardFunction*()>& backward_function_getter,
+      const std::function<void(BackwardFunction*)>& backward_function_deleter);
+}
 // Template instantiations here
 
 inline bool IsDtypeTrainable(DataType dtype) {
@@ -999,7 +1026,7 @@ Status ForwardAccumulator<Gradient, BackwardFunction, TapeTensor>::Accumulate(
     gtl::ArraySlice<tensorflow::DataType> input_dtypes,
     const ForwardFunction<Gradient>* forward_function,
     const std::function<BackwardFunction*()>& backward_function_getter,
-    const std::function<void(BackwardFunction*)>& backward_function_deleter) {
+    const std::function<void(BackwardFunction*)>& backward_function_deleter) override {
   if (call_state_.top().backward_tape != nullptr) {
     // If backward_tape is not null, then this call to Accumulate is the result
     // of a still-active call to Accumulate which is running operations. We
@@ -1122,6 +1149,17 @@ Gradient* ForwardAccumulator<Gradient, BackwardFunction, TapeTensor>::FetchJVP(
   }
 }
 
+template <typename Gradient, typename BackwardFunction, typename TapeTensor>
+Status ForwardAccumulatorV2<Gradient, BackwardFunction, TapeTensor>::Accumulate(
+    const string& op_type, const std::vector<TapeTensor>& input_tensors,
+    const std::vector<TapeTensor>& output_tensors,
+    gtl::ArraySlice<int64> input_tensor_id,
+    gtl::ArraySlice<tensorflow::DataType> input_dtypes,
+    const ForwardFunction<Gradient>* forward_function,
+    const std::function<BackwardFunction*()>& backward_function_getter,
+    const std::function<void(BackwardFunction*)>& backward_function_deleter) override {
+      //Not Implemented 
+    }
 }  // namespace eager
 }  // namespace tensorflow
 

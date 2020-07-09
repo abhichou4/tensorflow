@@ -439,3 +439,7 @@ class ForwardAccumulator(object):
         return array_ops.zeros_like(tensor)
       return result
     return nest.map_structure(_fetch_jvp, primals)
+
+  @staticmethod
+  def _jvp_batch(self, primals, tangents):
+    raise NotImplementedError("work in progress")
