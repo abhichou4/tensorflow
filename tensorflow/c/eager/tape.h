@@ -200,7 +200,8 @@ class ForwardFunction
 //
 // Not thread-safe.
 template <typename Gradient, typename BackwardFunction, typename TapeTensor>
-class ForwardAccumulatorClass {
+class ForwardAccumulator {
+ public:
   virtual Status Accumulate(
       const string& op_type, const std::vector<TapeTensor>& input_tensors,
       const std::vector<TapeTensor>& output_tensors,
@@ -209,11 +210,11 @@ class ForwardAccumulatorClass {
       const ForwardFunction<Gradient>* forward_function,
       const std::function<BackwardFunction*()>& backward_function_getter,
       const std::function<void(BackwardFunction*)>& backward_function_deleter) = 0;
-}
+};
 
 template <typename Gradient, typename BackwardFunction, typename TapeTensor>
-class ForwardAccumulator 
-  : public ForwardAccumulatorClass<Gradient, BackwardFunction, TapeTensor> {
+class ForwardAccumulatorV1 
+  : public ForwardAccumulator<Gradient, BackwardFunction, TapeTensor> {
  public:
   // Does not take ownership of `vspace`, which must outlive the
   // ForwardAccumulator.
@@ -350,8 +351,7 @@ class ForwardAccumulator
 
 template <typename Gradient, typename BackwardFunction, typename TapeTensor>
 class ForwardAccumulatorV2 : 
-  public ForwardAccumulatorClass<Gradient, BackwardFunction, TapeTensor>, 
-  public ForwardAccumulator<Gradient, BackwardFunction, TapeTensor> {
+  public ForwardAccumulatorV1<Gradient, BackwardFunction, TapeTensor> {
  public:
   Status Accumulate(
       const string& op_type, const std::vector<TapeTensor>& input_tensors,
@@ -361,7 +361,7 @@ class ForwardAccumulatorV2 :
       const ForwardFunction<Gradient>* forward_function,
       const std::function<BackwardFunction*()>& backward_function_getter,
       const std::function<void(BackwardFunction*)>& backward_function_deleter);
-}
+};
 // Template instantiations here
 
 inline bool IsDtypeTrainable(DataType dtype) {
