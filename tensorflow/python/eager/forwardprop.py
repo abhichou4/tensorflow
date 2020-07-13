@@ -443,3 +443,4 @@ class ForwardAccumulator(object):
   @staticmethod
   def _jvp_batch(self, primals, tangents):
     raise NotImplementedError("work in progress")
+  
