@@ -182,7 +182,7 @@ class ForwardFunction
   template <typename lambda_type>
   explicit ForwardFunction(lambda_type lambda)
       : std::function<Status(const std::vector<Gradient*>&,
-                             std::vector<Gradient*>*)>(lambda) {}
+                             std::vector<Gradient*>*, bool)>(lambda) {}
 };
 
 // Computes Jacobian-vector products using forward-mode automatic
@@ -1158,8 +1158,63 @@ Status ForwardAccumulatorV2<Gradient, BackwardFunction, TapeTensor>::Accumulate(
     const ForwardFunction<Gradient>* forward_function,
     const std::function<BackwardFunction*()>& backward_function_getter,
     const std::function<void(BackwardFunction*)>& backward_function_deleter) override {
-      //Not Implemented 
+  if (!ShouldRecord(input_tensor_id, input_dtypes)) {
+    return Status::OK();
+  }
+  std::vector<Gradient*> new_zeros;
+  auto delete_new_zeros = gtl::MakeCleanup([&new_zeros, this] {
+    for (Gradient* tensor : new_zeros) {
+      this->vspace_.DeleteGradient(tensor);
     }
+  });
+  std::vector<Gradient*> in_grads;
+  in_grads.reserve(input_tensor.size());
+  // is the shape of zero tensors fine here?
+  for (int target_index = 0; target_index < input_tensors.size();
+       ++target_index) {
+    const auto current_grad =
+        accumulated_gradients_.find(input_tensors[target_index].GetID());
+    if (current_grad == accumulated_gradients_.end()) {
+      if (IsDtypeTrainable(input_tensors[target_index].GetDType())) {
+        // ForwardAccumulator defaults to zeros for unwatched Tensors, unlike
+        // GradientTape which uses ones.
+        Gradient* zero = input_tensors[target_index].ZerosLike();
+        new_zeros.push_back(zero);
+        in_grads.push_back(zero);
+      } else {
+        in_grads.push_back(nullptr);
+      }
+    } else {
+      in_grads.push_back(current_grad->second);
+    }
+  }
+
+  std::vector<Gradient*> forward_grads;
+  if (forward_function==nullptr) {
+    //Raise apt error
+  }
+  else {
+    TF_RETURN_IF_ERROR((*forward_function)(in_grads, &forward_grads));
+  }
+  for (int i = 0; i < forward_grads.size(); ++i) {
+    if (forward_grads[i] != nullptr) {
+      int64 tensor_id = output_tensors[i].GetID();
+      auto existing = accumulated_gradients_.find(tensor_id);
+      if (existing != accumulated_gradients_.end()) {
+        // This is a somewhat odd case to be in, since it means we have two
+        // operations which supposedly both created the same Tensor. It comes up
+        // in recompute_grad, where the gradients have the same value. However,
+        // only the original gradient is connected to everything else, so we
+        // should still use that.
+        vspace_.DeleteGradient(forward_grads[i]);
+      } else {
+        accumulated_gradients_[output_tensors[i].GetID()] = forward_grads[i];
+      }
+    }
+  }
+  return Status::OK();
+}
+}
 }  // namespace eager
 }  // namespace tensorflow
 
