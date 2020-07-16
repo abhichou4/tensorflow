@@ -326,7 +326,7 @@ class ForwardAccumulator(object):
   <tf.Tensor: shape=(2,), dtype=float32, numpy=array([6., 0.], dtype=float32)>
   """
 
-  def __init__(self, primals, tangents):
+  def __init__(self, primals, tangents, use_batch=False):
     """Specify tensors to watch and their Jacobian-vector products.
 
     Mathematically, `tangents` is a vector right-multiplying the Jacobian matrix
@@ -348,7 +348,7 @@ class ForwardAccumulator(object):
       ValueError: If the same tensor or variable is specified multiple times in
         `primals`.
     """
-    self._accumulator = pywrap_tfe.TFE_Py_ForwardAccumulatorNew(False)
+    self._accumulator = pywrap_tfe.TFE_Py_ForwardAccumulatorNew(use_batch)
     self._recording = False
     primal_ids = set()
     for primal in nest.flatten(primals):
@@ -439,8 +439,3 @@ class ForwardAccumulator(object):
         return array_ops.zeros_like(tensor)
       return result
     return nest.map_structure(_fetch_jvp, primals)
-
-  @staticmethod
-  def _jvp_batch(self, primals, tangents):
-    raise NotImplementedError("work in progress")
-  

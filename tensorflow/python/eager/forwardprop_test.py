@@ -1009,7 +1009,7 @@ class HessianTests(test.TestCase, parameterized.TestCase):
     self.assertAllClose(hess_value, hessian_pfor)
 
 
-class JacobianTests(test.TestCase, parameterized.TestCase):
+class BatchTests(test.TestCase, parameterized.TestCase):
 
   @parameterized.parameters([(math_ops.sin, (2, 3), 5),
                              (math_ops.sin, (2, 3, 4), 10)])
@@ -1019,6 +1019,20 @@ class JacobianTests(test.TestCase, parameterized.TestCase):
     self.assertAllClose(
         _jvp_batch(f, primals, tangent_batch)[1],
         _jvp_batch_matmul(f, primals, *tangent_batch))
+
+  def testBatchForRegularOps(self, primals, tangents):
+    x = constant_op.constant(2.0)
+    y = constant_op.constant(5.0)
+    tangents = (
+      constant_op.constant([1., 0.,  1.]),
+      constant_op.constant([0., 1., 1.]),
+     )
+    with forwardprop.ForwardAccumulator([x, y], tangents, True) as acc:
+      z = x * y
+    self.assertAllClose(
+      acc._jvp(z),
+      _jvp_batch()
+    )
 
 
 if __name__ == "__main__":
