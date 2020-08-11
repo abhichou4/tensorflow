@@ -1041,6 +1041,28 @@ class BatchTests(test.TestCase, parameterized.TestCase):
       z = x * y
     self.assertAllClose(acc.jvp(z), constant_op.constant([5.0, 2.0, 7.0]))
 
+  def testBachOnModel(self):
+    x = constant_op.constant(5.)
+    class _Model(module.Module):
+      def __init__(self):
+        super().__init__()
+        self.a_variable = variables.Variable(5.0)
+        self.non_trainable_variable = variables.Variable(5.0, trainable=False)
+      def __call__(self, x):
+        return self.a_variable * x + self.non_trainable_variable
+
+    model = _Model()
+    print(model.trainable_variables)
+    with forwardprop.ForwardAccumulator._batch_accumulator(
+      primals=model.trainable_variables,
+      tangents=(constant_op.constant([1., 0.]), )) as acc:
+      primal_out = model(5.)
+      jvps = acc.jvp(primal_out)
+    with backprop.GradientTape() as tape:
+      y = model(x)
+      grad = tape.gradient(y, model.trainable_variables)
+    self.assertAllClose(jvps, grad)
+
 
 if __name__ == "__main__":
   # TODO(allenl): Also test with 1.x-style graph mode.
